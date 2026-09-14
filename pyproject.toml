@@ -1,0 +1,10 @@
+[project]
+name = "formation-walk"
+version = "1.0.0"
+description = "舞蹈队形走位 API：跨全部帧联合求解成员-点位分配"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
