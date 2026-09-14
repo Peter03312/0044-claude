@@ -181,3 +181,27 @@ def test_trailing_newline_and_crlf_tolerated():
     resp = post(body)
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
+
+
+def test_huge_coordinates_ok_not_server_error():
+    big = 1e150
+    members = {"members": [{"id": "a", "roles": [], "max_step": 2e150}, {"id": "b", "roles": [], "max_step": 2e150}]}
+    frame0 = {"points": [{"x": big, "y": 0, "lock": "a"}, {"x": -big, "y": 0, "lock": "b"}]}
+    frame1 = {"points": [{"x": big, "y": big}, {"x": -big, "y": big}]}
+    resp = post(ndjson(members, frame0, frame1))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["sorting_basis"]["max_step"] == pytest.approx(big)
+
+
+def test_huge_coordinates_infeasible_not_server_error():
+    big = 1e150
+    members = {"members": [{"id": "a", "roles": [], "max_step": 0.5e150}, {"id": "b", "roles": [], "max_step": 2e150}]}
+    frame0 = {"points": [{"x": big, "y": 0, "lock": "a"}, {"x": -big, "y": 0, "lock": "b"}]}
+    frame1 = {"points": [{"x": big, "y": big}, {"x": -big, "y": big}]}
+    resp = post(ndjson(members, frame0, frame1))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "infeasible"
+    assert body["first_infeasible_prefix_end"]["frame_index"] == 1

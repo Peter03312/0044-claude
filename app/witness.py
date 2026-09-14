@@ -21,7 +21,7 @@ from .contracts import (
     PrefixEnd,
 )
 from .parser import Problem, eligibility
-from .solver import EPS_FEAS, feasible
+from .solver import EPS_FEAS, distance_scale, feasible
 
 NOTE = (
     "逐点诊断为锁定/角色/步距的成对检查：步距相对于上一帧中该成员所有可站立点取最近值，"
@@ -81,6 +81,8 @@ def build_witness(problem: Problem) -> InfeasibleResponse:
     frame = problem.frames[bad]
     prev = problem.frames[bad - 1] if bad > 0 else None
     elig = eligibility(problem)
+    # 与求解器一致的尺度感知容差：d > max_step + EPS_FEAS * 特征尺度
+    step_tol = EPS_FEAS * distance_scale(problem, bad + 1)
 
     points_out: list[PointWitness] = []
     for q, point in enumerate(frame.points):
@@ -118,16 +120,21 @@ def build_witness(problem: Problem) -> InfeasibleResponse:
                     d = math.hypot(pa.x - point.x, pa.y - point.y)
                     if d < best_d:
                         best_p, best_d = p, d
-                if best_d > mem.max_step + EPS_FEAS:
+                if best_d > mem.max_step + step_tol:
+                    finite = math.isfinite(best_d)
                     violations.append(
                         PointViolation(
                             member=mem.id,
                             code="STEP_TOO_FAR",
                             detail=(
                                 f"{mem.id} 从上一帧最近的可站立点 points[{best_p}] 到该点需 "
-                                f"{best_d:.6g}，超过其单步上限 {mem.max_step:.6g}"
+                                + (
+                                    f"{best_d:.6g}，超过其单步上限 {mem.max_step:.6g}"
+                                    if finite
+                                    else f"的距离超出浮点表示范围，必然超过其单步上限 {mem.max_step:.6g}"
+                                )
                             ),
-                            needed_distance=best_d,
+                            needed_distance=best_d if finite else None,
                             max_step=mem.max_step,
                             nearest_point=best_p,
                         )
